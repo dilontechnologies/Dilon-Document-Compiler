@@ -5,7 +5,7 @@
 This repository is a [Claude Code plugin](https://code.claude.com/docs/en/plugins) that bundles four Skills for working with Dilon Technologies' regulatory-compliant technical documentation:
 
 - **`dilon-document-writer`** - create a new Dilon document from the standard template, and apply Dilon markdown styling conventions while editing existing Dilon documents.
-- **`dilon-document-compiler`** - compile a Dilon-formatted markdown file into a Word document: a regulatory-compliant document (signature page, revision history table, table of contents) by default, or a header/footer-only form/traveler when the front matter sets `include_front_matter: false`.
+- **`dilon-document-compiler`** - compile a Dilon-formatted markdown file into a Word document: a regulatory-compliant document (signature page, revision history table, table of contents - the table of contents can be omitted with `include_toc: false`) by default, or a header/footer-only form/traveler when the front matter sets `include_front_matter: false`.
 - **`dilon-document-form-writer`** - create a new Dilon form/traveler document from its own template, and document the form-only markdown markers (`FillLine`, `FieldGrid`, `Form_Section_Header`, and the `@@@FORM_SECTION@@@` wrapper they require).
 - **`dilon-document-extractor`** - bootstrap a Dilon markdown draft from an existing Word or PDF document.
 
@@ -17,13 +17,13 @@ This repository is a [Claude Code plugin](https://code.claude.com/docs/en/plugin
 Clone the repository:
 
 ```powershell
-git clone https://github.com/dilontechnologies/dilon-claude-tools.git C:\Users\YourUsername\Local_Documents\Local_Repos\dilon-claude-tools
+git clone https://github.com/dilontechnologies/Dilon-Document-Compiler.git C:\Users\YourUsername\Local_Documents\Local_Repos\Dilon-Document-Compiler
 ```
 
 Then, from an elevated (Administrator) PowerShell session, run `install.ps1` from the repo root to auto-install the prerequisites above via winget and pip:
 
 ```powershell
-cd C:\Users\YourUsername\Local_Documents\Local_Repos\dilon-claude-tools
+cd C:\Users\YourUsername\Local_Documents\Local_Repos\Dilon-Document-Compiler
 .\install.ps1
 ```
 
@@ -38,7 +38,7 @@ The `dilon-document-writer` and `dilon-document-form-writer` skills have no exte
 This repo is its own [plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces). From within Claude Code:
 
 ```
-/plugin marketplace add dilontechnologies/dilon-claude-tools
+/plugin marketplace add dilontechnologies/Dilon-Document-Compiler
 /plugin install dilon-tools@dilon-claude-tools
 ```
 
@@ -54,7 +54,7 @@ Authentication uses your existing git credentials (PAT or SSH) - the same access
 ### Testing locally before relying on the marketplace
 
 ```
-/plugin marketplace add ./dilon-claude-tools
+/plugin marketplace add ./Dilon-Document-Compiler
 /plugin install dilon-tools@dilon-claude-tools
 ```
 
@@ -88,7 +88,7 @@ Claude: *uses dilon-document-compiler skill*
 ## Repository structure
 
 ```
-dilon-claude-tools/
+Dilon-Document-Compiler/
 ├── CLAUDE.md                     # project knowledge doc for Claude Code sessions
 ├── RELEASING.md                  # branch/release model (REL/DEV/BUG, versioning, CI gates)
 ├── VERSION.txt                   # canonical version for CI - keep in sync with plugin.json

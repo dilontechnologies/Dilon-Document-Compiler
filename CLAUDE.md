@@ -11,10 +11,10 @@ This is a **self-hosted Claude Code plugin** for Windows environments, providing
 
 **Distribution Workflow:**
 - No package registry, no build/publish artifact step. Users install directly from this git repo via Claude Code's plugin marketplace commands:
-  - `/plugin marketplace add dilontechnologies/dilon-claude-tools`
+  - `/plugin marketplace add dilontechnologies/Dilon-Document-Compiler`
   - `/plugin install dilon-tools@dilon-claude-tools`
 - Updates: `/plugin marketplace update dilon-claude-tools` then `/plugin update dilon-tools@dilon-claude-tools` - both always track the repo's default branch (`master`); `claude plugin marketplace add` has no ref-pinning flag, so merging to `master` is what actually ships an update.
-- Local testing before relying on the marketplace: `/plugin marketplace add ./dilon-claude-tools` (run from the parent directory of a clone)
+- Local testing before relying on the marketplace: `/plugin marketplace add ./Dilon-Document-Compiler` (run from the parent directory of a clone)
 - See `README.md` for the full install/update/troubleshooting instructions, and `RELEASING.md` for the governed branch model (`DEV`/`BUG`/`REL` branches, CI gates, tagging, GitHub Releases) that gates what lands on `master`.
 
 **Local-clone development (bypassing `master`/releases entirely):** the
@@ -67,6 +67,7 @@ against the clone after each command.
 - Runs `scripts/check_deps.py` first; if it reports any `[FAIL]`, stops and tells the user which dependency is missing (pointing at `install.ps1`) rather than attempting a partial compile.
 - Invokes `scripts/generate_dilon_doc.py <input.md> <output.docx> <base_template>` with the base template argument always explicit (never relies on the script's own default template lookup).
 - Front matter's `include_front_matter` boolean (default `true`) selects the compile mode: `true` produces a regulatory-compliant Word document (signature page + revision history table + content + table of contents, all built programmatically, not template-baked - only header/footer/styles come from the base template); `false` produces a header/footer-only form/traveler - no signature page, no revision table, no TOC. This flag replaced the separate `dilon-document-form-compiler` skill, retired 2026-09.
+- Front matter's `include_toc` boolean (default `true`, opt-out) omits the table of contents from a narrative document when `false`; the body still starts on a new page after the revision table, because the compiler forces a page break there instead (`insert_page_break_before_body()`, used in place of `insert_page_break_after_toc()`). A missing key keeps the TOC (backward compatible); a non-boolean value (e.g. a quoted `"false"`) fails compilation with an error; it has no effect when `include_front_matter` is `false` (forms never have a TOC). Implemented in `generate_dilon_doc.py` as `generate_toc = include_front_matter and include_toc`, fed to `markdown_to_docx(include_toc=...)` and gating `insert_page_break_after_toc()`; a narrative document without a TOC gets `insert_page_break_before_body()` instead.
 - Every `@@@FORM_FIELD:FillLine/FieldGrid/Form_Section_Header@@@` marker, in either mode, must be wrapped in `@@@FORM_SECTION@@@`/`@@@END_FORM_SECTION@@@` (`lib/dilon_form_fields.py`'s `apply_form_fields()`/`FormSectionError`) - a form-flavored section's own heading stays ordinary content outside the tag, so it's numbered and gets a TOC entry like any other section.
 - Every compiled inline picture gets its aspect ratio locked for interactive resize (`lib/dilon_docx_common.py`'s `lock_image_aspect_ratios()`) - see "Image Aspect Ratio Lock" below.
 - Verifies the output file exists after the script runs; reports stdout/stderr to the user on failure, or the output path on success.
@@ -99,7 +100,7 @@ against the clone after each command.
 ## Repository Structure
 
 ```
-dilon-claude-tools/
+Dilon-Document-Compiler/
 ├── CLAUDE.md                          # this file
 ├── README.md                          # install/usage/troubleshooting guide
 ├── RELEASING.md                       # branch/release model (REL/DEV/BUG, versioning, CI gates)

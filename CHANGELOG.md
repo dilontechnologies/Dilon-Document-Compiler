@@ -5,6 +5,14 @@ All notable changes to the Dilon Claude Tools MCP Server will be documented in t
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `dilon-document-compiler`: front-matter `include_toc: false` omits the table of contents from a narrative document - for short documents that don't need one. The body still starts on a new page after the revision history table (the compiler forces a page break there in place of the one that normally follows the table of contents). It is an opt-out: documents without the key keep the table of contents exactly as before. A non-boolean value (e.g. a quoted `"false"`) fails compilation with an error, and the key has no effect when `include_front_matter` is `false`. See `MARKDOWN_STYLING_GUIDE.md` section 1
+
+### Changed
+- The repository moved to `https://github.com/dilontechnologies/Dilon-Document-Compiler`; the clone URL, `/plugin marketplace add` commands, and clone folder name in `README.md`, `CLAUDE.md`, and `install.ps1` now use it. The marketplace identifier `dilon-claude-tools` (in `marketplace.json` and `dilon-tools@dilon-claude-tools`) is unchanged, so existing installs keep working
+
 ## [3.0.0] - 2026-09-25
 
 ### Changed

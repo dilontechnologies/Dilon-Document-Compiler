@@ -1,7 +1,7 @@
 """Extract a Dilon-style .docx into a best-effort Dilon markdown draft.
 
 See docs/superpowers/specs/2026-08-17-document-extraction-and-form-tooling-design.md
-(dilon-claude-tools repo) for the design this implements.
+(Dilon-Document-Compiler repo) for the design this implements.
 """
 
 import re

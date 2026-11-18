@@ -316,7 +316,7 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Install the plugin in Claude Code:" -ForegroundColor White
-Write-Host "     /plugin marketplace add dilontechnologies/dilon-claude-tools" -ForegroundColor Gray
+Write-Host "     /plugin marketplace add dilontechnologies/Dilon-Document-Compiler" -ForegroundColor Gray
 Write-Host "     /plugin install dilon-tools@dilon-claude-tools" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Documentation:" -ForegroundColor Cyan

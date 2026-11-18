@@ -1880,6 +1880,223 @@ def test_compile_toc_forces_page_break_after_toc():
     )
 
 
+def _compile_toc_option_document(name, markdown):
+    """Compile `markdown` to TEST_OUTPUT_DIR/<name>.docx through the real
+    CLI. Returns (CompletedProcess, output_docx_path). Any stale output
+    from a previous run is removed first so 'file exists' checks mean
+    something."""
+    input_md = TEST_OUTPUT_DIR / f"{name}.md"
+    output_docx = TEST_OUTPUT_DIR / f"{name}.docx"
+    if output_docx.exists():
+        output_docx.unlink()
+    input_md.write_text(markdown, encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(COMPILER_SCRIPT), str(input_md), str(output_docx), str(SIGNATURE_TEMPLATE)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+    )
+    return result, output_docx
+
+
+def _with_front_matter_line(markdown, line):
+    """Insert one extra YAML line into the front matter of a test document
+    (after current_revision, which every test sample has)."""
+    anchor = 'current_revision: "00"\n'
+    return markdown.replace(anchor, anchor + line + "\n", 1)
+
+
+def _find_toc_content_control(doc):
+    """Pandoc's table-of-contents <w:sdt> in the body, or None."""
+    for child in doc.element.body:
+        if child.tag == qn('w:sdt'):
+            gallery = child.find('.//' + qn('w:docPartGallery'))
+            if gallery is not None and gallery.get(qn('w:val')) == 'Table of Contents':
+                return child
+    return None
+
+
+def _body_has_page_break(doc):
+    """True if any top-level body element holds an explicit page break."""
+    return any(
+        br.get(qn('w:type')) == 'page'
+        for child in doc.element.body
+        for br in child.iter(qn('w:br'))
+    )
+
+
+def test_compile_include_toc_false_omits_toc_but_page_breaks_after_revision_table():
+    """`include_toc: false` removes the table of contents, but the body must
+    still start on a new page after the revision history table - the front
+    page stays the signature + revision page. Everything else a narrative
+    document has (signature table, revision table, numbered headings) is
+    still produced."""
+    markdown = _with_front_matter_line(SAMPLE_MARKDOWN, "include_toc: false")
+    result, output_docx = _compile_toc_option_document("compile_test_include_toc_false", markdown)
+    check(result.returncode == 0, "compiler exits 0 when include_toc is false")
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr)
+        return
+
+    doc = Document(output_docx)
+    check(_find_toc_content_control(doc) is None, "no table of contents is generated")
+    # Locate, among the top-level body elements, the revision history table,
+    # every page-break paragraph, and the first body heading.
+    children = list(doc.element.body)
+    revision_table_index = next(
+        (i for i, c in enumerate(children)
+         if c.tag == qn('w:tbl') and "REVISION HISTORY" in "".join(t.text or "" for t in c.iter(qn('w:t')))),
+        None,
+    )
+    page_break_indices = [
+        i for i, c in enumerate(children)
+        if c.tag == qn('w:p') and any(br.get(qn('w:type')) == 'page' for br in c.iter(qn('w:br')))
+    ]
+    first_heading_index = next(
+        (i for i, c in enumerate(children)
+         if c.tag == qn('w:p')
+         and c.find(qn('w:pPr') + '/' + qn('w:pStyle')) is not None
+         and c.find(qn('w:pPr') + '/' + qn('w:pStyle')).get(qn('w:val')) == 'Heading2'),
+        None,
+    )
+    check(
+        revision_table_index is not None and first_heading_index is not None,
+        "found the revision table and the first body heading to compare positions",
+    )
+    check(
+        len(page_break_indices) == 1,
+        f"exactly one forced page break is inserted (found {len(page_break_indices)})",
+    )
+    check(
+        revision_table_index is not None and first_heading_index is not None and len(page_break_indices) == 1
+        and revision_table_index < page_break_indices[0] < first_heading_index,
+        "the page break sits after the revision history table and before the first body heading",
+    )
+    check(len(doc.tables) >= 2, f"signature and revision tables are still generated (found {len(doc.tables)} tables)")
+    check(
+        any("REVISION HISTORY" in t.rows[0].cells[0].text for t in doc.tables),
+        "the revision history table is still present",
+    )
+    headings = [p for p in doc.paragraphs if p.style is not None and p.style.name == "Heading 2"]
+    check(
+        any("Purpose and Scope" in p.text for p in headings),
+        "body headings are still generated as Heading 2",
+    )
+
+
+def test_compile_include_toc_true_keeps_toc():
+    """An explicit `include_toc: true` behaves exactly like leaving the key
+    out: table of contents present, forced page break right after it."""
+    markdown = _with_front_matter_line(SAMPLE_MARKDOWN, "include_toc: true")
+    result, output_docx = _compile_toc_option_document("compile_test_include_toc_true", markdown)
+    check(result.returncode == 0, "compiler exits 0 when include_toc is true")
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr)
+        return
+
+    doc = Document(output_docx)
+    toc_sdt = _find_toc_content_control(doc)
+    check(toc_sdt is not None, "the table of contents is generated")
+    if toc_sdt is None:
+        return
+    siblings = list(doc.element.body)
+    next_el = siblings[siblings.index(toc_sdt) + 1]
+    page_break = next_el.find('.//' + qn('w:br'))
+    check(
+        page_break is not None and page_break.get(qn('w:type')) == 'page',
+        "a forced page break still follows the table of contents",
+    )
+    page_break_count = sum(
+        1 for c in siblings
+        if c.tag == qn('w:p') and any(br.get(qn('w:type')) == 'page' for br in c.iter(qn('w:br')))
+    )
+    check(
+        page_break_count == 1,
+        f"with a table of contents, that page break is the only one the compiler adds - unchanged (found {page_break_count})",
+    )
+
+
+def test_compile_include_toc_non_boolean_fails_clearly():
+    """A quoted "false" is a string, which is truthy - silently keeping the
+    table of contents would be a surprise, so a non-boolean value must fail
+    compilation with a message that names the key."""
+    markdown = _with_front_matter_line(SAMPLE_MARKDOWN, 'include_toc: "false"')
+    result, output_docx = _compile_toc_option_document("compile_test_include_toc_string", markdown)
+    check(result.returncode != 0, "compiler exits non-zero for a non-boolean include_toc")
+    combined = result.stdout + result.stderr
+    # The compiler echoes every front-matter key in its "Metadata extracted"
+    # line, so only an "Error" line mentioning the key proves the message.
+    error_lines = [line for line in combined.splitlines() if line.startswith("Error")]
+    check(
+        any("include_toc" in line for line in error_lines),
+        f"an Error line names the include_toc key (error lines: {error_lines})",
+    )
+    check(
+        "true or false" in combined.lower(),
+        "the error says the value must be true or false",
+    )
+    check(not output_docx.exists(), "no output file is written when include_toc is invalid")
+
+
+def test_compile_include_toc_false_keeps_cross_references():
+    """Section and figure cross-references resolve from headings and
+    bookmarks, not from the table of contents, so they must still work
+    with the contents omitted."""
+    images_dir = TEST_OUTPUT_DIR / "diagrams"
+    images_dir.mkdir(parents=True, exist_ok=True)
+    (images_dir / "example.png").write_bytes(make_test_png())
+
+    markdown = _with_front_matter_line(SAMPLE_MARKDOWN, "include_toc: false") + FULL_XREF_MARKDOWN
+    result, output_docx = _compile_toc_option_document("compile_test_include_toc_false_xref", markdown)
+    check(result.returncode == 0, "compiler exits 0 for a no-contents document with cross-references")
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr)
+        return
+
+    with zipfile.ZipFile(output_docx) as z:
+        xml = z.read('word/document.xml').decode('utf-8')
+    check('REF fig:widget \\h' in xml, "the figure reference still resolves without a table of contents")
+    check('REF sec:assembly \\r \\h' in xml, "the section reference still resolves without a table of contents")
+    check('REF step:install-widget \\w \\h' in xml, "the step reference still resolves without a table of contents")
+
+
+def test_compile_include_toc_ignored_for_form_documents():
+    """A form/traveler (include_front_matter: false) has no table of
+    contents regardless, so include_toc: true must not add one."""
+    markdown = (
+        '---\n'
+        'title: "Include TOC Form Test"\n'
+        'author: "Test Suite"\n'
+        'department: "Engineering"\n'
+        'doc_number: "FO-99998"\n'
+        'current_revision: "00"\n'
+        'include_front_matter: false\n'
+        'include_toc: true\n'
+        'department_head: "Test Head"\n'
+        'signature_fields: []\n'
+        'revisions:\n'
+        '  - number: "00"\n'
+        '    description: "Initial test"\n'
+        '    eco_number: "ECO-000"\n'
+        '    eco_date: "2025-01-01"\n'
+        '---\n'
+        '\n'
+        '| Position | Serial Number |\n'
+        '|----------|----------------|\n'
+        '| 1        |                |\n'
+    )
+    result, output_docx = _compile_toc_option_document("compile_test_include_toc_form", markdown)
+    check(result.returncode == 0, "compiler exits 0 for a form document that sets include_toc: true")
+    if result.returncode != 0:
+        print(result.stdout)
+        print(result.stderr)
+        return
+    form_doc = Document(output_docx)
+    check(_find_toc_content_control(form_doc) is None, "a form document still has no table of contents")
+    check(not _body_has_page_break(form_doc), "a form document gets no forced page break")
+
+
 def test_get_step_clarification_abstract_num_id_found():
     """SIGNATURE_TEMPLATE must have the 'Dilon Step Clarification List'
     style + sample paragraph built per the spec's Template Requirement
@@ -3119,6 +3336,11 @@ def main():
     test_resolve_reference_markers_preserves_other_formatting_in_same_paragraph()
     test_heading2_has_no_automatic_page_break()
     test_compile_toc_forces_page_break_after_toc()
+    test_compile_include_toc_false_omits_toc_but_page_breaks_after_revision_table()
+    test_compile_include_toc_true_keeps_toc()
+    test_compile_include_toc_non_boolean_fails_clearly()
+    test_compile_include_toc_false_keeps_cross_references()
+    test_compile_include_toc_ignored_for_form_documents()
     test_get_step_clarification_abstract_num_id_found()
     test_get_step_clarification_abstract_num_id_missing_style()
     test_create_num_instance_first_allocation()

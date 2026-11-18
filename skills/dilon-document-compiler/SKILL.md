@@ -5,7 +5,7 @@ description: Compile a Dilon-formatted markdown file (with YAML front matter) in
 
 # Dilon Document Compiler
 
-Wraps the Dilon Document Compiler Python script to convert a markdown file with Dilon YAML front matter into a formatted .docx. By default (`include_front_matter: true`, or the field omitted) this is a full narrative document: signature page + revision table + content with TOC. With `include_front_matter: false` in the front matter, it compiles a form/traveler instead - running header/footer only, no signature page, no TOC - the same output `dilon-document-form-compiler` used to produce before that skill was retired in favor of this one flag.
+Wraps the Dilon Document Compiler Python script to convert a markdown file with Dilon YAML front matter into a formatted .docx. By default (`include_front_matter: true`, or the field omitted) this is a full narrative document: signature page + revision table + content with TOC. The TOC is opt-out: `include_toc: false` in the front matter omits it, and the body still starts on a new page after the revision table - intended for short documents (omitting the key keeps the TOC; the value must be a bare `true`/`false`, not a quoted string). With `include_front_matter: false` in the front matter, it compiles a form/traveler instead - running header/footer only, no signature page, no TOC - the same output `dilon-document-form-compiler` used to produce before that skill was retired in favor of this one flag.
 
 ## Before compiling
 

@@ -5,7 +5,7 @@ dilon-document-compiler and dilon-document-form-compiler.
 
 Moved out of generate_dilon_doc.py as a pure refactor - see
 docs/superpowers/specs/2026-08-17-document-extraction-and-form-tooling-design.md
-(dilon-claude-tools repo) for why these two skills share this module.
+(Dilon-Document-Compiler repo) for why these two skills share this module.
 """
 
 import math
@@ -1741,6 +1741,36 @@ def insert_page_break_after_toc(docx_file):
     run.append(br)
     break_paragraph.append(run)
     toc_sdt.addnext(break_paragraph)
+
+    doc.save(docx_file)
+
+
+def insert_page_break_before_body(docx_file):
+    """
+    Force a page break as the very first element of a converted body
+    document, so that - once merged after the signature and revision
+    history tables - the body starts on a new page. Used instead of
+    insert_page_break_after_toc() when a narrative document has opted out
+    of the table of contents (front-matter `include_toc: false`): with no
+    TOC to start the page, the front page would otherwise run straight into
+    the body.
+
+    Same mechanism as insert_page_break_after_toc() (a paragraph holding
+    only a page break), so the two layouts behave alike.
+    """
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    doc = Document(docx_file)
+    body = doc.element.body
+
+    break_paragraph = OxmlElement('w:p')
+    run = OxmlElement('w:r')
+    br = OxmlElement('w:br')
+    br.set(qn('w:type'), 'page')
+    run.append(br)
+    break_paragraph.append(run)
+    body.insert(0, break_paragraph)
 
     doc.save(docx_file)
 

@@ -7,7 +7,8 @@ form/traveler, selected by the front-matter boolean `include_front_matter`
 (default true):
 - true: signature page + revision table + content with TOC, the full
   postprocessing chain (step numbering, cross-references, figure
-  captions).
+  captions). The TOC is opt-out: front matter `include_toc: false` omits
+  it for short documents; the body still starts on a new page.
 - false: header/footer only, no signature page, no TOC - what
   dilon-document-form-compiler used to produce as a separate skill.
 
@@ -62,6 +63,7 @@ from dilon_docx_common import (  # noqa: E402
     lock_image_aspect_ratios,
     markdown_to_docx,
     insert_page_break_after_toc,
+    insert_page_break_before_body,
     convert_horizontal_rules_to_page_breaks,
     extract_yaml_and_markdown,
     default_output_filename,
@@ -408,6 +410,23 @@ def generate_requirements_document(markdown_path, output_path=None, signature_te
 
     include_front_matter = metadata.get('include_front_matter', True)
 
+    # include_toc is an opt-out: a narrative document gets a table of
+    # contents unless its front matter says `include_toc: false`. It must be
+    # a real boolean - a quoted "false" is a non-empty string, which is
+    # truthy, and would silently keep the contents the author tried to omit.
+    include_toc = metadata.get('include_toc', True)
+    if not isinstance(include_toc, bool):
+        print(
+            f"Error: front matter 'include_toc' must be true or false (got {include_toc!r}). "
+            "Remove the key to include the table of contents, or write include_toc: false "
+            "(no quotes) to omit it."
+        )
+        sys.exit(1)
+    # A form/traveler has no headings to build a contents page from, so the
+    # table of contents exists only for a narrative document that has not
+    # opted out.
+    generate_toc = include_front_matter and include_toc
+
     markdown_body = render_jinja(markdown_body, metadata)
     if include_front_matter:
         markdown_body = preprocess_reference_markers(markdown_body)
@@ -474,10 +493,14 @@ def generate_requirements_document(markdown_path, output_path=None, signature_te
         markdown_body, temp_part_d,
         reference_doc=signature_template_path,
         resource_dir=Path(markdown_path).resolve().parent,
-        include_toc=include_front_matter,
+        include_toc=generate_toc,
     )
-    if include_front_matter:
+    if generate_toc:
         insert_page_break_after_toc(temp_part_d)
+    elif include_front_matter:
+        # Narrative document that opted out of the TOC: the body still
+        # starts on a new page after the signature/revision front page.
+        insert_page_break_before_body(temp_part_d)
     convert_horizontal_rules_to_page_breaks(temp_part_d)
 
     # Apply all styles (tables and paragraphs) - scans Word document for @@@ markers, applies styles, removes markers
